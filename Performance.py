@@ -9,7 +9,7 @@ import statistics
 class PerformanceTestApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Performance Test By Jamal Balya v1.0.0")
+        self.root.title("Performance Test By Jamal Balya v1.0.1")
 
         # Calculate the center position of the window
         screen_width = self.root.winfo_screenwidth()
@@ -83,12 +83,20 @@ class PerformanceTestApp:
         popup_window.transient(self.root)  # Set as transient for the main window
         popup_window.grab_set()  # Set as a modal dialog
 
-        # Calculate the center position and size of the popup window
+        # Calculate the center position of the popup window relative to the main window
         popup_width = 400
         popup_height = 200
         popup_x_position = self.root.winfo_x() + (self.root.winfo_width() - popup_width) // 2
         popup_y_position = self.root.winfo_y() + (self.root.winfo_height() - popup_height) // 2
-        popup_window.geometry(f"{popup_width}x{popup_height}+{popup_x_position}+{popup_y_position}")
+
+        # Calculate the center position of the main window
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        main_x_position = (screen_width - popup_width) // 2
+        main_y_position = (screen_height - popup_height) // 2
+
+        # Adjust the popup window position to be centered on the main window
+        popup_window.geometry(f"{popup_width}x{popup_height}+{main_x_position}+{main_y_position}")
 
         popup_label = tk.Label(popup_window, text="On Progress......")
         popup_label.pack(pady=20)
@@ -99,15 +107,17 @@ class PerformanceTestApp:
     def perform_test(self, url, num_requests, popup_window):
         # Start the performance test
         response_times = []
+        responses = []
 
         for _ in range(num_requests):
             start_time = time.time()
             response = requests.get(url)
             end_time = time.time()
             response_time = end_time - start_time
+            responses.append(response)
             response_times.append(response_time)
 
-        # Calculate statistics
+        # Calculate metrics
         average_response_time = statistics.mean(response_times)
         std_dev_response_time = statistics.stdev(response_times) if len(response_times) > 1 else 0.0
         error_percentage = (response_times.count(0) / num_requests) * 100
@@ -115,14 +125,18 @@ class PerformanceTestApp:
         min_response_time = min(response_times)
         max_response_time = max(response_times)
 
+        received_kb_per_sec = sum(len(response.content) / 1024 for response in responses) / sum(response_times)
+        sent_kb_per_sec = 0  # Calculate based on your payload
+        avg_bytes = sum(len(response.content) for response in responses) / len(responses)
+
         # Update the result in the output text
-        self.root.after(0, self.update_result, average_response_time, std_dev_response_time, error_percentage, requests_per_second, min_response_time, max_response_time)
+        self.root.after(0, self.update_result, average_response_time, std_dev_response_time, error_percentage, requests_per_second, min_response_time, max_response_time, received_kb_per_sec, sent_kb_per_sec, avg_bytes)
 
         # Close the popup window and enable all buttons
         self.root.after(0, popup_window.destroy)
         self.root.after(0, self.enable_buttons)
 
-    def update_result(self, average_response_time, std_dev_response_time, error_percentage, requests_per_second, min_response_time, max_response_time):
+    def update_result(self, average_response_time, std_dev_response_time, error_percentage, requests_per_second, min_response_time, max_response_time, received_kb_per_sec, sent_kb_per_sec, avg_bytes):
         self.output_text.config(state=tk.NORMAL)
         self.output_text.delete("1.0", tk.END)
         self.output_text.insert(tk.END, f"Average Response Time: {average_response_time:.2f} seconds\n")
@@ -131,6 +145,9 @@ class PerformanceTestApp:
         self.output_text.insert(tk.END, f"Standard Deviation: {std_dev_response_time:.2f}\n")
         self.output_text.insert(tk.END, f"Error Percentage: {error_percentage:.2f}%\n")
         self.output_text.insert(tk.END, f"Throughput: {requests_per_second:.2f} requests per second\n")
+        self.output_text.insert(tk.END, f"Received KB/sec: {received_kb_per_sec:.2f} KB/sec\n")
+        self.output_text.insert(tk.END, f"Sent KB/sec: {sent_kb_per_sec:.2f} KB/sec\n")
+        self.output_text.insert(tk.END, f"Avg. Bytes: {avg_bytes:.2f} bytes\n")
 
         self.output_text.config(state=tk.DISABLED)
 
